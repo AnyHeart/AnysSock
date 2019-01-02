@@ -3,16 +3,24 @@
 
 #pragma comment(lib,"ws2_32.lib")
 
+/* #pragma warning(disable:4996) */
 #define IDC_EDIT_IN		101
 #define IDC_EDIT_OUT	102
 #define IDC_MAIN_BUTTON 103
 #define WM_SOCKET		104
 
+//shutdown(,HOW)专用宏定义 
+//课本缺失
+//How为描述禁止哪些操作，取值为：SD_RECEIVE、SD_SEND、SD_BOTH。
+#define SD_RECEIVE 0x00
+#define SD_SEND 0x01
+#define SD_BOTH 0x02
+
 /*域名*/
 char domain_name[] = "localhost";
-char *server = domain_name;
+char *szServer = domain_name;
 /*端口号*/
-int port = 5555;
+int nPort = 5555;
 
 HWND hEditIn = NULL;
 HWND hEditOut = NULL;
@@ -125,17 +133,109 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		SendMessage(hWndButton, WM_SETFONT, (WPARAM)hfDefault, MAKELPARAM(FALSE, 0));
 		
+		//配置WinSock套接字
+		WSADATA WsaDat;
+		int nResult = WSAStartup(MAKEWORD(2,2),&WsaDat);
+		if (nResult != 0) {
+			MessageBox(hWnd, "WinSock初始化失败！\r\n", "严重错误", MB_OK | MB_ICONERROR);
+			SendMessage(hWnd, WM_DESTROY, NULL, NULL);
+			break;
+		}
 
+		//创建套接字
+		Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (Socket == INVALID_SOCKET)
+		{
+			MessageBox(hWnd, "创建套接字失败！\r\n", "严重错误", MB_OK | MB_ICONERROR);
+			SendMessage(hWnd, WM_DESTROY, NULL, NULL);
+			break;
+		}
+
+		nResult = WSAAsyncSelect(Socket, hWnd, WM_SOCKET, (FD_CLOSE | FD_READ));
+
+		if (nResult) {
+			MessageBox(hWnd, "WSAAsyncSelect 异步套接字失败！\r\n", "严重错误", MB_OK | MB_ICONERROR);
+			SendMessage(hWnd, WM_DESTROY, NULL, NULL);
+			break;
+		}
+
+		//主机名解析
+		struct hostent * host;
+		if (( host = gethostbyname(szServer) ) == NULL)
+		{
+			MessageBox(hWnd, "不能解析主机名！\r\n", "严重错误", MB_OK | MB_ICONERROR);
+			SendMessage(hWnd, WM_DESTROY, NULL, NULL);
+			break;
+		}
+
+		//配置套接字地址信息
+		SOCKADDR_IN SockAddr;
+
+		SockAddr.sin_addr.s_addr = *((unsigned long *)host->h_addr);
+		SockAddr.sin_port = htons(nPort);
+		SockAddr.sin_family = AF_INET;
+		
+		//连接
+		connect(Socket, (LPSOCKADDR)(&SockAddr), sizeof(SockAddr));
 	}
 		break;
+	case WM_COMMAND:
+	{
+		switch (LOWORD(wParam))
+		{
+			case IDC_MAIN_BUTTON:
+			{
+				char szBuffer[1024];
+
+				int test = sizeof(szBuffer);
+				ZeroMemory(szBuffer,sizeof(szBuffer));
+
+				SendMessage(hEditOut, WM_GETTEXT, sizeof(szBuffer), reinterpret_cast<LPARAM>(szBuffer));
+				send(Socket, szBuffer, sizeof(szBuffer), 0);//strlen(szBuffer)
+				SendMessage(hEditOut,WM_SETTEXT,NULL,(LPARAM)"");
+			}break;
+		}
+	}break;
 	case WM_DESTROY:
 	{
 		PostQuitMessage(0);
-		//shutdown()
+		shutdown(Socket,SD_BOTH);
+		closesocket(Socket);
+		WSACleanup();
 		return 0;
-	}
-		break;
-	
+	}break;
+
+	case WM_SOCKET:
+	{
+		if (WSAGETSELECTERROR(lParam))
+		{
+			MessageBox(hWnd, "异步套接字设置失败！\r\n", "错误", MB_OK | MB_ICONERROR);
+			SendMessage(hWnd, WM_DESTROY, NULL, NULL);
+			break;
+		}
+		switch (WSAGETSELECTEVENT(lParam))
+		{
+			case FD_READ:
+			{
+				char szIncoming[1024];
+				ZeroMemory(szIncoming, sizeof(&szIncoming));
+
+				int inDataLength = recv(Socket,
+										szIncoming,
+										sizeof(szIncoming)/sizeof(szIncoming[0]),0);
+
+				strncat(szHistroy,szIncoming,inDataLength);
+
+				SendMessage(hEditIn, WM_SETTEXT, sizeof(szIncoming) - 1, reinterpret_cast<LPARAM>(&szHistroy));
+			}break;
+			case FD_CLOSE:
+			{
+				MessageBox(hWnd, "服务器关闭了连接！\r\n", "连接关闭", MB_ICONINFORMATION| MB_OK);
+				closesocket(Socket);
+				SendMessage(hWnd, WM_DESTROY, NULL, NULL);
+			}break;
+		}
+	}break;
 	default:
 		break;
 	}

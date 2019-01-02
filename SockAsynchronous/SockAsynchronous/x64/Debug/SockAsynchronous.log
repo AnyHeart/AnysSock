@@ -1,2 +1,3 @@
 ﻿  SockAsynchronous.cpp
-  SockAsynchronous.vcxproj -> C:\Users\Y\Git\AnysSock\SockAsynchronous\x64\Debug\SockAsynchronous.exe
+c:\users\y\git\anyssock\sockasynchronous\sockasynchronous\sockasynchronous.cpp(226): error C4996: 'strncat': This function or variable may be unsafe. Consider using strncat_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  c:\program files (x86)\windows kits\10\include\10.0.17134.0\ucrt\string.h(266): note: 参见“strncat”的声明
