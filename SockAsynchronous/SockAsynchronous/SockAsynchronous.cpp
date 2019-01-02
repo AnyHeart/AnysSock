@@ -106,7 +106,25 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		HGDIOBJ hfDefault = GetStockObject(DEFAULT_GUI_FONT);
 
 		SendMessage(hEditIn, WM_SETFONT, (WPARAM)hfDefault, MAKELPARAM(FALSE, 0));
-		SendMessage(hEditIn, WM_SETTEXT, NULL, (LPARAM)"正在连接服务器");
+		SendMessage(hEditIn, WM_SETTEXT, NULL, (LPARAM)"正在连接服务器...");
+
+		hEditOut = CreateWindowEx(WS_EX_CLIENTEDGE,"EDIT","",
+			WS_CHILD|WS_VISIBLE|ES_MULTILINE|ES_AUTOVSCROLL|ES_AUTOHSCROLL,
+			50,30,400,60,hWnd,(HMENU)IDC_EDIT_IN,GetModuleHandle(NULL),NULL);
+
+		if (!hEditIn) {
+			MessageBox(NULL, "不能创建发送消息框！\r\n", "错误", MB_OK | MB_ICONERROR);
+		}
+
+		SendMessage(hEditOut, WM_SETFONT, (WPARAM)hfDefault, MAKELPARAM(FALSE, 0));
+		SendMessage(hEditOut, WM_SETTEXT, NULL, (LPARAM)"请在这里输入要发送的消息...");
+
+		//创建发送按钮
+		HWND hWndButton = CreateWindowA("BUTTON", "发送", WS_TABSTOP|WS_VISIBLE|WS_CHILD|BS_DEFPUSHBUTTON, 50, 310,
+			75, 23, hWnd, (HMENU)IDC_MAIN_BUTTON,GetModuleHandle(NULL), NULL);
+
+		SendMessage(hWndButton, WM_SETFONT, (WPARAM)hfDefault, MAKELPARAM(FALSE, 0));
+		
 
 	}
 		break;
